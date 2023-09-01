@@ -1,8 +1,10 @@
 window.addEventListener('load', () => {
-  initDT(); // Initialize the DatatTable and window.columnNames variables
-  addDarkmodeWidget();
+  const param = getParamFromUrl();
+  const repo = getRepoName(param);
+  const sortIdx = getSortIdx(param);
 
-  const repo = getRepoFromUrl();
+  initDT(sortIdx); // Initialize the DatatTable and window.columnNames variables
+  addDarkmodeWidget();
 
   if (repo) {
     document.getElementById('q').value = repo;
@@ -23,7 +25,8 @@ function fetchData() {
   const repo = document.getElementById('q').value.replaceAll(' ','');
   const re = /[-_\w]+\/[-_.\w]+/;
 
-  const urlRepo = getRepoFromUrl();
+  const param = getParamFromUrl();
+  const urlRepo = getRepoName(param)
 
   if (!urlRepo || urlRepo !== repo) {
     window.history.pushState('', '', `#${repo}`);
@@ -46,7 +49,7 @@ function updateDT(data) {
   // Format dataset and redraw DataTable. Use second index for key name
   const forks = [];
   for (let fork of data) {
-    fork.repoLink = `<a href="https://github.com/${fork.full_name}">Link</a>`;
+    fork.repoLink = `<a href="https://github.com/${fork.full_name}">${fork.name}</a>`;
     fork.ownerName = `<img src="${fork.owner.avatar_url || 'https://avatars.githubusercontent.com/u/0?v=4'}&s=48" width="24" height="24" class="mr-2 rounded-circle" />${fork.owner ? fork.owner.login : '<strike><em>Unknown</em></strike>'}`;
     forks.push(fork);
   }
@@ -59,13 +62,13 @@ function updateDT(data) {
     .draw();
 }
 
-function initDT() {
+function initDT(sortIdx) {
   // Create ordered Object with column name and mapped display name
   window.columnNamesMap = [
-    // [ 'Repository', 'full_name' ],
-    ['Link', 'repoLink'], // custom key
+    // ['Repository', 'full_name' ],
     ['Owner', 'ownerName'], // custom key
-    ['Name', 'name'],
+    ['Link', 'repoLink'], // custom key
+    // ['Name', 'name'],
     ['Branch', 'default_branch'],
     ['Stars', 'stargazers_count'],
     ['Forks', 'forks'],
@@ -74,11 +77,16 @@ function initDT() {
     ['Last Push', 'pushed_at'],
   ];
 
-  // Sort by stars:
-  const sortColName = 'Stars';
-  const sortColumnIdx = window.columnNamesMap
-    .map(pair => pair[0])
-    .indexOf(sortColName);
+  const count = window.columnNamesMap.map(pair => pair[0]).length
+
+  // 如果传参了排序列索引, 且索引有效则按索引, 否则按默认Stars排序
+  if(sortIdx && !isNaN(sortIdx) && sortIdx < count){
+    sortColumnIdx = sortIdx
+  }else{
+    sortColumnIdx = window.columnNamesMap
+      .map(pair => pair[0])
+      .indexOf('Stars');
+  }
 
   // Use first index for readable column name
   // we use moment's fromNow() if we are rendering for `pushed_at`; better solution welcome
@@ -86,6 +94,7 @@ function initDT() {
     columns: window.columnNamesMap.map(colNM => {
       return {
         title: colNM[0],
+        width: colNM[1] === 'ownerName' ? "20%":"auto",
         render:
           colNM[1] === 'pushed_at'
             ? (data, type, _row) => {
@@ -97,6 +106,7 @@ function initDT() {
             : null,
       };
     }),
+    autoWidth: false,
     order: [[sortColumnIdx, 'desc']],
     // paging: false,
     searchBuilder:{
@@ -106,13 +116,51 @@ function initDT() {
   let table = window.forkTable;
   new $.fn.dataTable.SearchBuilder(table, {});
   table.searchBuilder.container().prependTo(table.table().container());
+  table.columns.adjust().draw();
 }
 
-function fetchAndShow(repo) {
+/**
+ * 解析链接中的参数
+ */
+function parseParams(url) {
+  const params = {};
+  if (url.includes('?')) {
+    const paramString = url.split("?")[1];
+    if (paramString) {
+      paramString.split("&").forEach(param => {
+        const [key, value] = param.split("=");
+        params[key] = decodeURIComponent(value);
+      });
+    }
+  }
+  return params;
+}
+
+/**
+ * 从参数中获取排序列索引
+ * @param {*} url
+ * @returns
+ */
+function getSortIdx(url) {
+  const params = parseParams(url);
+  if ('sort' in params) {
+    sort = params['sort']
+  }
+  return sort;
+}
+
+function getRepoName(str) {
+  repo = str;
+  if (str.includes('?')) {
+    repo = str.split('?')[0]
+  }
   repo = repo.replace('https://github.com/', '');
   repo = repo.replace('http://github.com/', '');
   repo = repo.replace(/\.git$/, '');
+  return repo;
+}
 
+function fetchAndShow(repo) {
   fetch(
     `https://api.github.com/repos/${repo}/forks?sort=stargazers&per_page=100`
   )
@@ -152,7 +200,7 @@ function showMsg(msg, type) {
     `;
 }
 
-function getRepoFromUrl() {
+function getParamFromUrl() {
   const urlRepo = location.hash && location.hash.slice(1);
 
   return urlRepo && decodeURIComponent(urlRepo);
