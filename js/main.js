@@ -162,8 +162,27 @@ function getRepoName(str) {
   return repo;
 }
 
+/**
+ * 重试请求fetch
+ * @param {*} url 请求链接
+ * @param {*} retries 重试次数
+ * @returns
+ */
+function retryFetch(url, retries = 3) {
+  return fetch(url)
+    .then(response => {
+      if (response.ok) {
+        return response;
+      }
+      if (retries > 0) {
+        return retryFetch(url, retries - 1);
+      }
+      throw new Error('请求失败');
+    });
+}
+
 function fetchAndShow(repo) {
-  fetch(
+  retryFetch(
     `https://api.github.com/repos/${repo}/forks?sort=stargazers&per_page=100`
   )
     .then(response => {
