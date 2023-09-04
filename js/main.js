@@ -50,7 +50,7 @@ function updateDT(data) {
   const forks = [];
   for (let fork of data) {
     fork.repoLink = `<a href="https://github.com/${fork.full_name}">${fork.name}</a>`;
-    fork.ownerName = `<img src="${fork.owner.avatar_url || 'https://avatars.githubusercontent.com/u/0?v=4'}&s=48" width="24" height="24" class="mr-2 rounded-circle" />${fork.owner ? fork.owner.login : '<strike><em>Unknown</em></strike>'}`;
+    fork.ownerName = `<img src="${fork.owner.avatar_url || 'https://avatars.githubusercontent.com/u/0?v=4'}&s=48" width="24" height="24" class="mr-2 rounded-circle" />${fork.owner ? `<a href="https://github.com/${fork.owner.login}">${fork.owner.login}</a>` : '<strike><em>Unknown</em></strike>'}`;
     forks.push(fork);
   }
   const dataSet = forks.map(fork =>
@@ -143,6 +143,8 @@ function parseParams(url) {
  */
 function getSortIdx(url) {
   const params = parseParams(url);
+  // 默认按Stars排序
+  sort = 3;
   if ('sort' in params) {
     sort = params['sort']
   }
